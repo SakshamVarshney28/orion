@@ -6,6 +6,7 @@ import { Providers } from "@/components/providers";
 
 import "./globals.css";
 
+import "allotment/dist/style.css";
 
 const inter = Inter({
   variable: "--font-inter",
