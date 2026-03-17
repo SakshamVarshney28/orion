@@ -1,49 +1,44 @@
 import ky from "ky";
-import { z } from "zod";
-import { toast } from "sonner";
 
-const suggestionRequestSchema = z.object({
-  fileName: z.string(),
-  code: z.string(),
-  currentLine: z.string(),
-  previousLines: z.string(),
-  textBeforeCursor: z.string(),
-  textAfterCursor: z.string(),
-  nextLines: z.string(),
-  lineNumber: z.number(),
-});
+type Res = { suggestion?: string };
 
-const suggestionResponseSchema = z.object({
-  suggestion: z.string(),
-});
-
-type SuggestionRequest = z.infer<typeof suggestionRequestSchema>;
-type SuggestionResponse = z.infer<typeof suggestionResponseSchema>;
-
-export const fetcher = async (
-  payload: SuggestionRequest,
-  signal: AbortSignal,
-): Promise<string | null> => {
+export async function fetcher(
+  payload: {
+    fileName: string;
+    before: string;
+    after: string;
+    textBeforeCursor: string;
+    textAfterCursor: string;
+  },
+  signal: AbortSignal
+): Promise<string | null> {
   try {
-    const validatedPayload = suggestionRequestSchema.parse(payload);
+    const res = await ky.post("/api/suggestion", {
+      json: payload,
+      signal,
+      timeout: 8000,
+      retry: 0,
+    });
 
-    const response = await ky
-      .post("/api/suggestion", {
-        json: validatedPayload,
-        signal,
-        timeout: 10_000,
-        retry: 0,
-      })
-      .json<SuggestionResponse>();
+    const data = (await res.json()) as Res;
 
-    const validatedResponse = suggestionResponseSchema.parse(response);
-
-    return validatedResponse.suggestion || null;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
+    if (!data || typeof data.suggestion !== "string") {
       return null;
     }
-    toast.error("Failed to fetch AI completion");
+
+    return data.suggestion || null;
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      (err.name === "AbortError" ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.code === "ERR_ABORTED" ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.code === "ECONNRESET")
+    ) {
+      return null;
+    }
+
     return null;
   }
-};
+}

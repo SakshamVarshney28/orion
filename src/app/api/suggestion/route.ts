@@ -1,217 +1,85 @@
-import { generateText, Output } from "ai";
+import { generateText } from "ai";
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { anthropic } from "@ai-sdk/anthropic";
-// import { google } from "@ai-sdk/google";
 
-const suggestionSchema = z.object({
-    suggestion: z
-        .string()
-        .describe(
-            "The code to insert at cursor, or empty string if no completion needed"
-        ),
-});
+const PROMPT = `
+You are a code autocomplete engine.
 
-const SUGGESTION_PROMPT = `
-You are a code completion engine.
-
-Predict what code should appear at the cursor.
+Return ONLY code to insert.
 
 Rules:
-- Return ONLY the code to insert.
-- Do not explain anything.
-- Do not repeat code already present.
-- If no completion is needed return an empty string.
+- No explanation
+- No repetition
+- Short output
+- Empty if unsure
 
 File: {fileName}
 
-Code before cursor:
-{textBeforeCursor}
+Before:
+{before}
 
-Code after cursor:
-{textAfterCursor}
+Cursor:
+{textBeforeCursor}|{textAfterCursor}
+
+After:
+{after}
 `;
 
-export async function POST(request: Request) {
-    try {
-        const { userId } = await auth();
-
-        if (!userId) {
-            return NextResponse.json(
-                { error: "Unauthorized" },
-                { status: 403 },
-            );
-        }
-
-        const {
-            fileName,
-            code,
-            currentLine,
-            previousLines,
-            textBeforeCursor,
-            textAfterCursor,
-            nextLines,
-            lineNumber,
-        } = await request.json();
-
-        if (!code) {
-            return NextResponse.json(
-                { error: "Code is required" },
-                { status: 400 }
-            );
-        }
-
-        const prompt = SUGGESTION_PROMPT
-            .replace("{fileName}", fileName)
-            .replace("{code}", code)
-            .replace("{currentLine}", currentLine)
-            .replace("{previousLines}", previousLines || "")
-            .replace("{textBeforeCursor}", textBeforeCursor)
-            .replace("{textAfterCursor}", textAfterCursor)
-            .replace("{nextLines}", nextLines || "")
-            .replace("{lineNumber}", lineNumber.toString());
-
-        const { output } = await generateText({
-            model: anthropic("claude-haiku-4-5-20251001"),
-            //   model: google("gemini-2.5-flash-lite"),
-            output: Output.object({ schema: suggestionSchema }),
-            prompt,
-            temperature: 0.1,
-            maxOutputTokens: 100,
-        });
-
-        return NextResponse.json({ suggestion: output.suggestion })
-    } catch (error) {
-        console.error("Suggestion error: ", error);
-        return NextResponse.json(
-            { error: "Failed to generate suggestion" },
-            { status: 500 },
-        );
-    }
+function clean(text: string): string {
+  if (!text) return "";
+  return text.replace(/```[\s\S]*?```/g, "").trim();
 }
 
+export async function POST(req: Request) {
+  try {
+    const { userId } = await auth();
 
-// code for multimodel with openrouter - keeping it here for reference, but not using it currently since google's gemini-2.5-flash-lite is performing well
+    if (!userId) {
+      return NextResponse.json({ suggestion: "" });
+    }
 
+    const body = await req.json().catch(() => null);
 
-// import { generateText } from "ai";
-// import { auth } from "@clerk/nextjs/server";
-// import { NextResponse } from "next/server";
+    if (!body) {
+      return NextResponse.json({ suggestion: "" });
+    }
 
-// import { createOpenAI } from "@ai-sdk/openai";
-// import { google } from "@ai-sdk/google";
-// import { anthropic } from "@ai-sdk/anthropic";
+    const {
+      fileName = "",
+      before = "",
+      after = "",
+      textBeforeCursor = "",
+      textAfterCursor = "",
+    } = body;
 
-// // OpenRouter provider
-// const openrouter = createOpenAI({
-//   apiKey: process.env.OPENROUTER_API_KEY,
-//   baseURL: "https://openrouter.ai/api/v1",
-//   headers: {
-//     "HTTP-Referer": "http://localhost:3000",
-//     "X-Title": "AI IDE Project",
-//   },
-// });
+    const prompt = PROMPT
+      .replace("{fileName}", fileName)
+      .replace("{before}", before)
+      .replace("{after}", after)
+      .replace("{textBeforeCursor}", textBeforeCursor)
+      .replace("{textAfterCursor}", textAfterCursor);
 
-// // Cursor-style autocomplete prompt
-// const SUGGESTION_PROMPT = `
-// You are an AI code completion engine.
+    const result = await generateText({
+      model: anthropic("claude-haiku-4-5-20251001"),
+      prompt,
+      temperature: 0.05,
+      maxOutputTokens: 60,
+    });
 
-// Predict what code should appear at the cursor.
+    return NextResponse.json({
+      suggestion: clean(result?.text ?? ""),
+    });
+  } catch (err: unknown) {
+    if (
+      err instanceof Error &&
+      (err.name === "AbortError" ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any)?.code === "ECONNRESET")
+    ) {
+      return new Response(null, { status: 499 });
+    }
 
-// Rules:
-// - Return ONLY the code to insert.
-// - Do not explain anything.
-// - Do not repeat existing code.
-// - If no completion is needed return empty string.
-
-// File: {fileName}
-
-// Code before cursor:
-// {textBeforeCursor}
-
-// Code after cursor:
-// {textAfterCursor}
-// `;
-
-// export async function POST(request: Request) {
-//   try {
-//     const { userId } = await auth();
-
-//     if (!userId) {
-//       return NextResponse.json(
-//         { error: "Unauthorized" },
-//         { status: 403 }
-//       );
-//     }
-
-//     const {
-//       fileName,
-//       textBeforeCursor,
-//       textAfterCursor,
-//     } = await request.json();
-
-//     const prompt = SUGGESTION_PROMPT
-//       .replace("{fileName}", fileName || "")
-//       .replace("{textBeforeCursor}", textBeforeCursor || "")
-//       .replace("{textAfterCursor}", textAfterCursor || "");
-
-//     // Model priority
-//     const models = [
-//       openrouter("deepseek/deepseek-chat:free"),
-//       openrouter("mistral/devstral-2:free"),
-//       openrouter("qwen/qwen3-coder:free"),
-//       google("gemini-2.5-flash-lite"),
-//       anthropic("claude-haiku-4-5-20251001"),
-//     ];
-
-//     let response: Awaited<ReturnType<typeof generateText>> | null = null;
-
-//     for (const model of models) {
-//       try {
-//         console.log("Trying model:", model.modelId);
-
-//         response = await generateText({
-//           model,
-//           prompt,
-//           temperature: 0.1,
-//           maxOutputTokens: 80,
-//           timeout: 10000,
-//         });
-
-//         if (response.text) {
-//           console.log("Success with:", model.modelId);
-//           break;
-//         }
-
-//       } catch (error: unknown) {
-//         console.error("Model failed:", model.modelId);
-
-//         if (error instanceof Error) {
-//           console.error(error.message);
-//         } else {
-//           console.error(error);
-//         }
-//       }
-//     }
-
-//     if (!response || !response.text) {
-//       return NextResponse.json(
-//         { error: "No suggestion generated" },
-//         { status: 500 }
-//       );
-//     }
-
-//     return NextResponse.json({
-//       suggestion: response.text.trim(),
-//     });
-
-//   } catch (error) {
-//     console.error("Suggestion error:", error);
-
-//     return NextResponse.json(
-//       { error: "Failed to generate suggestion" },
-//       { status: 500 }
-//     );
-//   }
-// }
+    return NextResponse.json({ suggestion: "" });
+  }
+}
