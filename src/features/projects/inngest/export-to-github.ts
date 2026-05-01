@@ -81,7 +81,7 @@ export const exportToGithub = inngest.createFunction(
     const { data: repo } = await step.run("create-repo", async () => {
       return await octokit.rest.repos.createForAuthenticatedUser({
         name: repoName,
-        description: description || `Exported from Polaris`,
+        description: description || `Exported from Orion`,
         private: visibility === "private",
         auto_init: true,
       });
@@ -209,7 +209,7 @@ export const exportToGithub = inngest.createFunction(
       return await octokit.rest.git.createCommit({
         owner: user.login,
         repo: repoName,
-        message: "Initial commit from Polaris",
+        message: "Initial commit from Orion",
         tree: tree.sha,
         parents: [initialCommitSha],
       });
