@@ -146,16 +146,16 @@ export const exportToGithub = inngest.createFunction(
       throw new NonRetriableError("No files to export");
     }
 
-    // Create blobs for each file
-    const treeItems = await step.run("create-blobs", async () => {
-      const items: {
-        path: string;
-        mode: "100644";
-        type: "blob";
-        sha: string;
-      }[] = [];
+    // Create blobs for each file in individual steps to avoid Vercel timeouts
+    const treeItems: {
+      path: string;
+      mode: "100644";
+      type: "blob";
+      sha: string;
+    }[] = [];
 
-      for (const [path, file] of fileEntries) {
+    for (const [path, file] of fileEntries) {
+      const item = await step.run(`create-blob-${file._id}`, async () => {
         let content: string;
         let encoding: "utf-8" | "base64" = "utf-8";
 
@@ -170,7 +170,7 @@ export const exportToGithub = inngest.createFunction(
           encoding = "base64";
         } else {
           // Skip files with no content
-          continue;
+          return null;
         }
 
         const { data: blob } = await octokit.rest.git.createBlob({
@@ -180,16 +180,18 @@ export const exportToGithub = inngest.createFunction(
           encoding,
         });
 
-        items.push({
+        return {
           path,
-          mode: "100644",
-          type: "blob",
+          mode: "100644" as const,
+          type: "blob" as const,
           sha: blob.sha,
-        });
-      }
+        };
+      });
 
-      return items;
-    });
+      if (item) {
+        treeItems.push(item);
+      }
+    }
 
     if (treeItems.length === 0) {
       throw new NonRetriableError("Failed to create any file blobs");
