@@ -1,0 +1,1 @@
+npx inngest-cli@latest dev
