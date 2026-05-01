@@ -45,7 +45,7 @@ export const NewProjectDialog = ({
 
     try {
       const { projectId } = await ky
-        .post("/api/projects/create-with-prompt", {
+        .post("/api/projects/create-with-prompts", {
           json: { prompt: message.text.trim() },
         })
         .json<{ projectId: Id<"projects"> }>();
