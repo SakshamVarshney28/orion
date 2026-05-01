@@ -85,11 +85,11 @@ export const getById = query({
     const project = await ctx.db.get("projects", args.id);
 
     if (!project) {
-      throw new Error("Project not found");
+      return null;
     }
 
     if (project.ownerId !== identity.subject) {
-      throw new Error("Unauthorized access to this project");
+      return null;
     }
 
     return project;

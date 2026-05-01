@@ -74,7 +74,7 @@ export const ProjectsView = () => {
                 "text-4xl md:text-5xl font-semibold",
                 font.className,
               )}>
-                Orion
+                Orion IDE
               </h1>
             </div>
 

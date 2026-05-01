@@ -5,8 +5,8 @@ import { Id } from "../../../../convex/_generated/dataModel";
 import { NonRetriableError } from "inngest";
 import { convex } from "@/lib/convex-client";
 import { api } from "../../../../convex/_generated/api";
-import { 
-  CODING_AGENT_SYSTEM_PROMPT, 
+import {
+  CODING_AGENT_SYSTEM_PROMPT,
   TITLE_GENERATOR_SYSTEM_PROMPT
 } from "./constants";
 import { DEFAULT_CONVERSATION_TITLE } from "../constants";
@@ -56,14 +56,14 @@ export const processMessage = inngest.createFunction(
     event: "message/sent",
   },
   async ({ event, step }) => {
-    const { 
-      messageId, 
+    const {
+      messageId,
       conversationId,
       projectId,
       message
     } = event.data as MessageEvent;
 
-    const internalKey = process.env.ORION_CONVEX_INTERNAL_KEY; 
+    const internalKey = process.env.ORION_CONVEX_INTERNAL_KEY;
 
     if (!internalKey) {
       throw new NonRetriableError("ORION_CONVEX_INTERNAL_KEY is not configured");
@@ -114,23 +114,23 @@ export const processMessage = inngest.createFunction(
       conversation.title === DEFAULT_CONVERSATION_TITLE;
 
     if (shouldGenerateTitle) {
-       const titleAgent = createAgent({
+      const titleAgent = createAgent({
         name: "title-generator",
         system: TITLE_GENERATOR_SYSTEM_PROMPT,
         model: anthropic({
           model: "claude-haiku-4-5-20251001",
           defaultParameters: { temperature: 0, max_tokens: 50 },
         }),
-       });
+      });
 
-       const { output } = await titleAgent.run(message, { step });
+      const { output } = await titleAgent.run(message, { step });
 
-       const textMessage = output.find(
+      const textMessage = output.find(
         (m) => m.type === "text" && m.role === "assistant"
       );
 
       if (textMessage?.type === "text") {
-         const title = 
+        const title =
           typeof textMessage.content === "string"
             ? textMessage.content.trim()
             : textMessage.content
@@ -155,11 +155,11 @@ export const processMessage = inngest.createFunction(
       name: "orion",
       description: "An expert AI coding assistant",
       system: systemPrompt,
-       model: anthropic({
+      model: anthropic({
         model: "claude-haiku-4-5-20251001",
         defaultParameters: { temperature: 0.3, max_tokens: 16000 }
-       }),
-       tools: [
+      }),
+      tools: [
         createListFilesTool({ internalKey, projectId }),
         createReadFilesTool({ internalKey }),
         createUpdateFileTool({ internalKey }),
@@ -168,7 +168,7 @@ export const processMessage = inngest.createFunction(
         createRenameFileTool({ internalKey }),
         createDeleteFilesTool({ internalKey }),
         createScrapeUrlsTool(),
-       ],
+      ],
     });
 
     // Create network with single agent
