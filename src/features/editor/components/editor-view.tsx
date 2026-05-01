@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { useRef , useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 import { useFile, useUpdateFile } from "@/features/projects/hooks/use-files";
 
@@ -8,6 +8,7 @@ import { useEditor } from "../hooks/use-editor";
 import { TopNavigation } from "./top-navigation";
 import { FileBreadcrumbs } from "./file-breadcrumbs";
 import { Id } from "../../../../convex/_generated/dataModel";
+import { AlertTriangleIcon } from "lucide-react";
 
 const DEBOUNCE_MS = 1500;
 
@@ -20,7 +21,7 @@ export const EditorView = ({ projectId }: { projectId: Id<"projects"> }) => {
   const isActiveFileBinary = activeFile && activeFile.storageId;
   const isActiveFileText = activeFile && !activeFile.storageId;
 
-// Cleanup pending debounced updates on unmount or file change
+  // Cleanup pending debounced updates on unmount or file change
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -28,7 +29,6 @@ export const EditorView = ({ projectId }: { projectId: Id<"projects"> }) => {
       }
     };
   }, [activeTabId]);
-
 
   return (
     <div className="h-full flex flex-col">
@@ -65,7 +65,15 @@ export const EditorView = ({ projectId }: { projectId: Id<"projects"> }) => {
           />
         )}
         {isActiveFileBinary && (
-          <p>TODO: Implement binary preview</p>
+          <div className="size-full flex items-center justify-center">
+            <div className="flex flex-col items-center gap-2.5 max-w-md text-center">
+              <AlertTriangleIcon className="size-10 text-yellow-500" />
+              <p className="text-sm">
+                The file is not displayed in the text editor because it is
+                either binary or uses an unsupported text encoding.
+              </p>
+            </div>
+          </div>
         )}
       </div>
     </div>
